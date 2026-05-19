@@ -241,6 +241,7 @@ vault/
 | POST | `/api/auth/register` | 注册 |
 | POST | `/api/auth/login` | 登录（失败自动计入限流） |
 | GET | `/api/auth/register-status` | 查询注册开关状态 |
+| GET | `/api/health` | 健康检查 |
 
 ### 产品
 | 方法 | 路径 | 说明 |
