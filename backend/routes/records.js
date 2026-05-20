@@ -149,7 +149,17 @@ router.post('/product/:productId', auth, async (req, res) => {
       const recordId = result.insertId;
 
       for (const col of cols) {
-        const val = values?.[col.field_key] ?? '';
+        let val = values?.[col.field_key] ?? '';
+        // datetime 字段处理：空时默认服务器当前时间，统一存为 "YYYY-MM-DD HH:MM" 格式
+        if (col.field_type === 'datetime') {
+          if (!val) {
+            const now = new Date();
+            const offset = now.getTimezoneOffset() * 60000;
+            val = new Date(now - offset).toISOString().slice(0, 16).replace('T', ' ');
+          } else {
+            val = val.replace('T', ' ').slice(0, 16); // 去掉秒，统一格式
+          }
+        }
         const storedVal = col.is_sensitive ? encrypt(val) : val;
         await conn.query(
           'INSERT INTO record_values (record_id, column_id, field_value, is_encrypted) VALUES (?, ?, ?, ?)',

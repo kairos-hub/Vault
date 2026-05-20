@@ -21,7 +21,12 @@ export default function RecordModal({ productId, columns, record, onClose, onSav
       });
     } else {
       const defaults = {};
-      columns.forEach(c => { defaults[c.field_key] = ''; });
+      // datetime 字段默认填入当前本地时间
+      const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+        .toISOString().slice(0, 16); // 格式：2026-05-20T14:30
+      columns.forEach(c => {
+        defaults[c.field_key] = c.field_type === 'datetime' ? nowLocal : '';
+      });
       setValues(defaults);
     }
   }, [record, columns]);
@@ -105,6 +110,12 @@ export default function RecordModal({ productId, columns, record, onClose, onSav
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
+                ) : col.field_type === 'datetime' ? (
+                  <input className="vault-input"
+                    type="datetime-local"
+                    value={val ? val.replace(' ', 'T').slice(0, 16) : ''}
+                    onChange={e => setValues(p => ({ ...p, [col.field_key]: e.target.value }))}
+                    style={{ colorScheme: 'dark' }} />
                 ) : col.field_type === 'password' ? (
                   <div className="relative">
                     <input className="vault-input"

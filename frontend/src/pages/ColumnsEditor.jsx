@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save, Lock, Type, AlignLeft, List, Hash, Link, Mail } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Lock, Type, AlignLeft, List, Hash, Link, Mail, Calendar } from 'lucide-react';
 import api from '../utils/api';
 
 const FIELD_TYPES = [
@@ -11,6 +11,7 @@ const FIELD_TYPES = [
   { value: 'number',   label: '数字',     Icon: Hash },
   { value: 'url',      label: '链接',     Icon: Link },
   { value: 'email',    label: '邮箱',     Icon: Mail },
+  { value: 'datetime', label: '日期时间', Icon: Calendar },
 ];
 
 const PRESETS = {

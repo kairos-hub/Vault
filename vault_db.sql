@@ -35,7 +35,7 @@ CREATE TABLE `column_definitions` (
   `product_id` bigint unsigned NOT NULL,
   `field_key` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `field_label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `field_type` enum('text','password','textarea','select','url','email','number') COLLATE utf8mb4_unicode_ci DEFAULT 'text',
+  `field_type` enum('text','password','textarea','select','url','email','number','datetime') COLLATE utf8mb4_unicode_ci DEFAULT 'text',
   `field_options` text COLLATE utf8mb4_unicode_ci,
   `is_required` tinyint(1) DEFAULT '0',
   `is_sensitive` tinyint(1) DEFAULT '0',
@@ -53,7 +53,7 @@ CREATE TABLE `column_definitions` (
 
 LOCK TABLES `column_definitions` WRITE;
 /*!40000 ALTER TABLE `column_definitions` DISABLE KEYS */;
-INSERT INTO `column_definitions` VALUES (8,2,'host','主机地址','text','[]',1,0,1,'2026-05-13 09:31:14'),(9,2,'port','端口','number','[]',1,0,2,'2026-05-13 09:31:14'),(10,2,'db_type','数据库类型','select','[\"MySQL\",\"PostgreSQL\",\"Redis\",\"MongoDB\",\"Oracle\",\"SQL Server\",\"SQLite\"]',1,0,3,'2026-05-13 09:31:14'),(11,2,'database_name','数据库名','text','[]',0,0,4,'2026-05-13 09:31:14'),(12,2,'username','用户名','text','[]',1,0,5,'2026-05-13 09:31:14'),(13,2,'password','密码','password','[]',1,1,6,'2026-05-13 09:31:14'),(15,3,'url','网站地址','url','[]',1,0,1,'2026-05-13 09:31:14'),(16,3,'username','账号/邮箱','text','[]',1,0,2,'2026-05-13 09:31:14'),(17,3,'password','密码','password','[]',1,1,3,'2026-05-13 09:31:14'),(18,3,'phone','绑定手机','text','[]',0,0,4,'2026-05-13 09:31:14'),(19,3,'email','绑定邮箱','email','[]',0,0,5,'2026-05-13 09:31:14'),(20,3,'notes','备注','textarea','[]',0,0,6,'2026-05-13 09:31:14'),(21,4,'service','服务名称','text','[]',1,0,1,'2026-05-13 09:31:14'),(22,4,'api_key','API Key','password','[]',1,1,2,'2026-05-13 09:31:14'),(23,4,'api_secret','API Secret','password','[]',0,1,3,'2026-05-13 09:31:14'),(24,4,'endpoint','接入地址','url','[]',0,0,4,'2026-05-13 09:31:14'),(25,4,'expire_date','到期日期','text','[]',0,0,5,'2026-05-13 09:31:14'),(26,4,'notes','备注','textarea','[]',0,0,6,'2026-05-13 09:31:14'),(102,1,'ip','服务器IP','text','[]',1,0,1,'2026-05-14 02:06:13'),(103,1,'port','SSH端口','number','[]',0,0,2,'2026-05-14 02:06:13'),(104,1,'username','账号','text','[]',1,0,3,'2026-05-14 02:06:13'),(105,1,'password','密码','password','[]',1,1,4,'2026-05-14 02:06:13'),(106,1,'region','地域','select','[\"IDC【超融合】\",\"IDC【Vmware】\",\"华东-上海\",\"华北-北京\",\"华南-广州\",\"华西-成都\",\"香港\",\"新加坡\",\"美国-西部\",\"美国-东部\",\"欧洲-法兰克福\",\"日本-东京\"]',0,0,5,'2026-05-14 02:06:13'),(107,1,'purpose','用途','text','[]',0,0,6,'2026-05-14 02:06:13'),(108,1,'notes','规格','text','[]',0,0,7,'2026-05-14 02:06:13'),(164,2,'notes','备注','textarea','[]',0,0,7,'2026-05-18 03:03:08');
+INSERT INTO `column_definitions` VALUES (8,2,'host','主机地址','text','[]',1,0,1,'2026-05-13 09:31:14'),(9,2,'port','端口','number','[]',1,0,2,'2026-05-13 09:31:14'),(10,2,'db_type','数据库类型','select','[\"MySQL\",\"PostgreSQL\",\"Redis\",\"MongoDB\",\"Oracle\",\"SQL Server\",\"SQLite\"]',1,0,3,'2026-05-13 09:31:14'),(11,2,'database_name','数据库名','text','[]',0,0,4,'2026-05-13 09:31:14'),(12,2,'username','用户名','text','[]',1,0,5,'2026-05-13 09:31:14'),(13,2,'password','密码','password','[]',1,1,6,'2026-05-13 09:31:14'),(15,3,'url','网站地址','url','[]',1,0,1,'2026-05-13 09:31:14'),(16,3,'username','账号/邮箱','text','[]',1,0,2,'2026-05-13 09:31:14'),(17,3,'password','密码','password','[]',1,1,3,'2026-05-13 09:31:14'),(18,3,'phone','绑定手机','text','[]',0,0,4,'2026-05-13 09:31:14'),(19,3,'email','绑定邮箱','email','[]',0,0,5,'2026-05-13 09:31:14'),(20,3,'notes','备注','textarea','[]',0,0,6,'2026-05-13 09:31:14'),(21,4,'service','服务名称','text','[]',1,0,1,'2026-05-13 09:31:14'),(22,4,'api_key','API Key','password','[]',1,1,2,'2026-05-13 09:31:14'),(23,4,'api_secret','API Secret','password','[]',0,1,3,'2026-05-13 09:31:14'),(24,4,'endpoint','接入地址','url','[]',0,0,4,'2026-05-13 09:31:14'),(25,4,'expire_date','到期日期','text','[]',0,0,5,'2026-05-13 09:31:14'),(26,4,'notes','备注','textarea','[]',0,0,6,'2026-05-13 09:31:14'),(102,1,'ip','服务器IP','text','[]',1,0,1,'2026-05-14 02:06:13'),(103,1,'port','SSH端口','number','[]',0,0,2,'2026-05-14 02:06:13'),(104,1,'username','账号','text','[]',1,0,3,'2026-05-14 02:06:13'),(105,1,'password','密码','password','[]',1,1,4,'2026-05-14 02:06:13'),(106,1,'region','地域','select','[\"IDC【超融合】\",\"IDC【Vmware】\",\"华东-上海\",\"华北-北京\",\"华南-广州\",\"华西-成都\",\"香港\",\"新加坡\",\"美国-西部\",\"美国-东部\",\"欧洲-法兰克福\",\"日本-东京\"]',0,0,5,'2026-05-14 02:06:13'),(107,1,'purpose','用途','text','[]',0,0,6,'2026-05-14 02:06:13'),(164,2,'notes','备注','textarea','[]',0,0,7,'2026-05-18 03:03:08');
 /*!40000 ALTER TABLE `column_definitions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -85,7 +85,8 @@ CREATE TABLE `products` (
 
 LOCK TABLES `products` WRITE;
 /*!40000 ALTER TABLE `products` DISABLE KEYS */;
-INSERT INTO `products` VALUES (1,'服务器管理','管理所有服务器的账号密码信息','server','#6366f1',1,'2026-05-13 09:31:14','2026-05-13 09:31:14'),(2,'数据库账号','数据库连接信息管理','database','#0ea5e9',1,'2026-05-13 09:31:14','2026-05-13 09:31:14'),(3,'网站账号','各类网站和服务的登录信息','globe','#10b981',1,'2026-05-13 09:31:14','2026-05-13 09:31:14'),(4,'API密钥','第三方服务API密钥管理','key','#f59e0b',1,'2026-05-13 09:31:14','2026-05-13 09:31:14');
+INSERT INTO `products` VALUES (1,'服务器管理','管理所有服务器的账号密码信息','server','#6366f1',1,NOW(),NOW()),
+(2,'数据库管理','数据库连接信息管理','database','#0ea5e9',1,NOW(),NOW()),(3,'网站账号','各类网站和服务的登录信息','globe','#10b981',1,NOW(),NOW()),(4,'API密钥','第三方服务API密钥管理','key','#f59e0b',1,NOW(),NOW());
 /*!40000 ALTER TABLE `products` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -194,7 +195,7 @@ CREATE TABLE `system_settings` (
 
 LOCK TABLES `system_settings` WRITE;
 /*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
-INSERT INTO `system_settings` VALUES ('allow_register','1','2026-05-18 09:16:21'),('api_rate_limit_enabled','0','2026-05-15 06:26:01'),('api_rate_limit_max','300','2026-05-15 06:18:31'),('api_rate_limit_window_min','5','2026-05-15 06:25:22'),('login_rate_limit_enabled','1','2026-05-15 06:18:31'),('login_rate_limit_max','5','2026-05-19 07:38:10'),('login_rate_limit_window_min','10','2026-05-19 07:38:10'),('title_hidden_1','0','2026-05-18 07:37:59'),('title_hidden_16','0','2026-05-15 09:11:10'),('title_hidden_2','0','2026-05-18 07:36:38'),('title_hidden_3','0','2026-05-18 07:36:43'),('title_label_1','标题','2026-05-15 06:55:41'),('title_label_16','标题12','2026-05-15 09:11:28'),('title_label_2','标题','2026-05-15 06:55:55'),('title_label_3','标题','2026-05-15 08:23:15');
+INSERT INTO `system_settings` VALUES ('allow_register','0','2026-05-18 09:16:21'),('api_rate_limit_enabled','0','2026-05-15 06:26:01'),('api_rate_limit_max','300','2026-05-15 06:18:31'),('api_rate_limit_window_min','5','2026-05-15 06:25:22'),('login_rate_limit_enabled','1','2026-05-15 06:18:31'),('login_rate_limit_max','5','2026-05-19 07:38:10'),('login_rate_limit_window_min','10','2026-05-19 07:38:10'),('title_hidden_1','0','2026-05-18 07:37:59'),('title_hidden_16','0','2026-05-15 09:11:10'),('title_hidden_2','0','2026-05-18 07:36:38'),('title_hidden_3','0','2026-05-18 07:36:43'),('title_label_1','标题','2026-05-15 06:55:41'),('title_label_16','标题12','2026-05-15 09:11:28'),('title_label_2','标题','2026-05-15 06:55:55'),('title_label_3','标题','2026-05-15 08:23:15');
 /*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -226,6 +227,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
+INSERT INTO `users` VALUES (1,'admin','$2a$10$fIb/6ZKbrs5jgFs6c6OP6uh5phzB0ZaUpYNgtT.grOvQEmFNz3J66','admin@example.com',1,0,NOW(),NOW(),NOW());
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

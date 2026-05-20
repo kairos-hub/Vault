@@ -79,7 +79,7 @@ export default function Layout() {
             总览
           </NavLink>
 
-          {user?.is_admin && (
+          {!!+user?.is_admin && (
             <NavLink to="/admin/users"
               className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm mb-0.5 transition-all ${isActive ? 'font-medium' : ''}`}

@@ -740,7 +740,13 @@ export default function ProductPage() {
                       return (
                         <td key={col.id} style={tdStyle}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {col.field_type === 'url' && valObj?.field_value ? (
+                            {col.field_type === 'datetime' && valObj?.field_value ? (
+                              <Tooltip content={valObj.field_value.replace('T', ' ')}>
+                                <span style={{ fontSize: '0.88rem', color: 'var(--text-dim)', whiteSpace: 'nowrap', fontFamily: '"JetBrains Mono", monospace' }}>
+                                  {valObj.field_value.replace('T', ' ')}
+                                </span>
+                              </Tooltip>
+                            ) : col.field_type === 'url' && valObj?.field_value ? (
                               <Tooltip content={valObj.field_value}>
                                 <a href={valObj.field_value} target="_blank" rel="noreferrer"
                                   style={{ color: '#6366f1', textDecoration: 'none', fontSize: '0.88rem', display: 'block', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
