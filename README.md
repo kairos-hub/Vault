@@ -133,15 +133,10 @@ npm run dev
 
 访问 `http://localhost:5173`
 
-### 4. 创建管理员
+### 4. 管理员账号
 
-注册第一个账号后，执行 SQL 将其设为管理员：
-
-```sql
-UPDATE users SET is_admin = 1 WHERE username = 'your_username';
-```
-
-之后可通过管理后台管理其他用户，无需再手动改数据库。
+默认账号：admin,密码：admin123,登录后请及时修改默认密码。
+之后可通过管理后台管理其他用户，也可以通过sql创建和修改用户信息。
 
 ---
 
