@@ -10,7 +10,7 @@ const ICONS = { server: Server, database: Database, globe: Globe, key: Key, fold
 export default function Layout() {
   const [products, setProducts] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [theme, setTheme] = useState(() => localStorage.getItem('vault_theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('vault_theme') || 'light');
   const [hoveredProduct, setHoveredProduct] = useState(null);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -25,10 +25,12 @@ export default function Layout() {
   useEffect(() => { fetchProducts(); }, []);
 
   useEffect(() => {
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-    } else {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
     }
     localStorage.setItem('vault_theme', theme);
   }, [theme]);

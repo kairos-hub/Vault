@@ -659,7 +659,7 @@ export default function ProductPage() {
       </div>
 
       {/* 表格 */}
-      <div className="flex-1 overflow-auto px-8 py-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-8 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <RefreshCw size={20} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
@@ -677,8 +677,8 @@ export default function ProductPage() {
             )}
           </div>
         ) : (
-          <div className="vault-card overflow-hidden">
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="vault-card" style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <th style={{ ...thStyle, width: 36, paddingRight: 4 }}>

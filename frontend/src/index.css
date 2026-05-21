@@ -2,25 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 深色主题（默认） */
+/* 亮色主题（默认） */
 :root {
-  --bg: #0d0f14;
-  --bg-card: #13161e;
-  --bg-hover: #1a1e28;
-  --border: #1f2433;
-  --border-bright: #2a3042;
-  --accent: #6366f1;
-  --accent-glow: rgba(99, 102, 241, 0.15);
-  --text: #e2e8f0;
-  --text-muted: #64748b;
-  --text-dim: #94a3b8;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-}
-
-/* 亮色主题 */
-:root.light {
   --bg: #f1f5f9;
   --bg-card: #ffffff;
   --bg-hover: #f8fafc;
@@ -31,6 +14,23 @@
   --text: #0f172a;
   --text-muted: #94a3b8;
   --text-dim: #475569;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+/* 深色主题 */
+:root.dark {
+  --bg: #0d0f14;
+  --bg-card: #13161e;
+  --bg-hover: #1a1e28;
+  --border: #1f2433;
+  --border-bright: #2a3042;
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --text: #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
