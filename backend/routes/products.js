@@ -8,7 +8,7 @@ router.get('/', auth, async (req, res) => {
     const [products] = await db.query(
       `SELECT p.*, 
         (SELECT COUNT(*) FROM records r WHERE r.product_id = p.id) AS record_count
-       FROM products p WHERE p.user_id = ? ORDER BY p.created_at`,
+       FROM products p WHERE p.user_id = ? ORDER BY p.sort_order ASC, p.created_at ASC`,
       [req.user.id]
     );
     res.json({ success: true, data: products });
@@ -22,12 +22,41 @@ router.post('/', auth, async (req, res) => {
   const { name, description, icon, color } = req.body;
   if (!name) return res.status(400).json({ success: false, message: '产品名称不能为空' });
   try {
+    const [[{ maxOrder }]] = await db.query(
+      'SELECT COALESCE(MAX(sort_order), 0) AS maxOrder FROM products WHERE user_id = ?',
+      [req.user.id]
+    );
     const [result] = await db.query(
-      'INSERT INTO products (name, description, icon, color, user_id) VALUES (?, ?, ?, ?, ?)',
-      [name, description || '', icon || 'folder', color || '#6366f1', req.user.id]
+      'INSERT INTO products (name, description, icon, color, user_id, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, description || '', icon || 'folder', color || '#6366f1', req.user.id, maxOrder + 1]
     );
     const [rows] = await db.query('SELECT * FROM products WHERE id = ?', [result.insertId]);
     res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 批量更新产品排序（必须在 /:id 之前，否则 reorder 会被当成 id）
+router.put('/reorder', auth, async (req, res) => {
+  const { order } = req.body;
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ success: false, message: 'order 必须是数组' });
+  }
+  try {
+    const ids = order.map(o => o.id);
+    const placeholders = ids.map(() => '?').join(',');
+    const [rows] = await db.query(
+      `SELECT id FROM products WHERE id IN (${placeholders}) AND user_id = ?`,
+      [...ids, req.user.id]
+    );
+    if (rows.length !== ids.length) {
+      return res.status(403).json({ success: false, message: '包含无权操作的产品' });
+    }
+    for (const { id, sort_order } of order) {
+      await db.query('UPDATE products SET sort_order = ? WHERE id = ?', [sort_order, id]);
+    }
+    res.json({ success: true, message: '排序已保存' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

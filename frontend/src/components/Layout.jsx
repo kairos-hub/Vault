@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Shield, Plus, LogOut, Server, Database, Globe, Key, Folder, Sun, Moon, Trash2, Users } from 'lucide-react';
 import api from '../utils/api';
@@ -12,6 +12,9 @@ export default function Layout() {
   const [showModal, setShowModal] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('vault_theme') || 'light');
   const [hoveredProduct, setHoveredProduct] = useState(null);
+  const dragRef = useRef(null);
+  const productsRef = useRef(products);
+  useEffect(() => { productsRef.current = products; }, [products]);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
@@ -37,6 +40,80 @@ export default function Layout() {
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
   const handleLogout = () => { logout(); navigate('/login'); };
+
+  // 拖拽排序：只用 ref，完全不触发重渲染，避免闭包和事件丢失问题
+  const dragOverRef = useRef(null);
+
+  const onDragStart = (e, productId) => {
+    dragRef.current = productId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', productId); // Firefox 必须
+    // 给拖拽元素加透明效果
+    setTimeout(() => {
+      const el = document.getElementById(`product-item-${productId}`);
+      if (el) el.style.opacity = '0.4';
+    }, 0);
+  };
+
+  const onDragOver = (e, productId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // 用 DOM 直接标记，不触发 React 重渲染
+    if (dragOverRef.current !== productId) {
+      if (dragOverRef.current) {
+        const prev = document.getElementById(`product-item-${dragOverRef.current}`);
+        if (prev) prev.style.borderTop = '2px solid transparent';
+      }
+      dragOverRef.current = productId;
+      const el = document.getElementById(`product-item-${productId}`);
+      if (el && dragRef.current !== productId) el.style.borderTop = '2px solid var(--accent)';
+    }
+  };
+
+  const onDragEnd = (productId) => {
+    const el = document.getElementById(`product-item-${productId}`);
+    if (el) el.style.opacity = '1';
+    if (dragOverRef.current) {
+      const prev = document.getElementById(`product-item-${dragOverRef.current}`);
+      if (prev) prev.style.borderTop = '2px solid transparent';
+    }
+    dragRef.current = null;
+    dragOverRef.current = null;
+  };
+
+  const onDrop = async (e, targetId) => {
+    e.preventDefault();
+    const dragId = dragRef.current;
+    // 清理样式
+    if (dragId) {
+      const el = document.getElementById(`product-item-${dragId}`);
+      if (el) el.style.opacity = '1';
+    }
+    if (dragOverRef.current) {
+      const el = document.getElementById(`product-item-${dragOverRef.current}`);
+      if (el) el.style.borderTop = '2px solid transparent';
+    }
+    dragRef.current = null;
+    dragOverRef.current = null;
+
+    if (!dragId || dragId === targetId) return;
+
+    const cur = productsRef.current;
+    const fromIdx = cur.findIndex(p => p.id === dragId);
+    const toIdx = cur.findIndex(p => p.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const next = [...cur];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setProducts(next);
+
+    try {
+      await api.put('/products/reorder', {
+        order: next.map((p, idx) => ({ id: p.id, sort_order: idx + 1 }))
+      });
+    } catch { fetchProducts(); }
+  };
 
   const handleDeleteProduct = async (e, productId) => {
     e.preventDefault();
@@ -111,26 +188,36 @@ export default function Layout() {
             const Icon = ICONS[p.icon] || Folder;
             const isHovered = hoveredProduct === p.id;
             return (
-              <div key={p.id} className="relative"
+              <div
+                key={p.id}
+                id={`product-item-${p.id}`}
+                draggable
+                onDragStart={e => onDragStart(e, p.id)}
+                onDragOver={e => onDragOver(e, p.id)}
+                onDrop={e => onDrop(e, p.id)}
+                onDragEnd={() => onDragEnd(p.id)}
                 onMouseEnter={() => setHoveredProduct(p.id)}
-                onMouseLeave={() => setHoveredProduct(null)}>
+                onMouseLeave={() => setHoveredProduct(null)}
+                style={{ borderTop: '2px solid transparent', borderRadius: 8, cursor: 'grab' }}>
                 <NavLink to={`/product/${p.id}`}
+                  draggable={false}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm mb-0.5 transition-all"
                   style={({ isActive }) => ({
                     background: isActive ? 'var(--bg-hover)' : 'transparent',
                     color: isActive ? 'var(--text)' : 'var(--text-muted)',
+                    cursor: 'grab',
                   })}>
                   <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                     style={{ background: p.color + '22' }}>
                     <Icon size={11} style={{ color: p.color }} />
                   </div>
-                  <span className="flex-1 truncate">{p.name}</span>
-                  {/* hover 时显示删除按钮，否则显示数量 */}
+                  <span className="flex-1 truncate" style={{ pointerEvents: 'none' }}>{p.name}</span>
                   {isHovered ? (
                     <button
-                      onClick={(e) => handleDeleteProduct(e, p.id)}
+                      draggable={false}
+                      onClick={e => handleDeleteProduct(e, p.id)}
                       title="删除产品"
-                      className="w-5 h-5 rounded flex items-center justify-center transition-all flex-shrink-0"
+                      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                       style={{ color: 'var(--danger)', border: 'none', background: 'rgba(239,68,68,0.1)', cursor: 'pointer' }}>
                       <Trash2 size={11} />
                     </button>

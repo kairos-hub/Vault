@@ -292,7 +292,10 @@ export default function ProductPage() {
   const [records, setRecords] = useState([]);
   const [pagination, setPagination] = useState({});
   const [search, setSearch] = useState('');
-  const [pageSize, setPageSize] = useState(() => parseInt(localStorage.getItem('vault_page_size')) || 20);
+  const [pageSize, setPageSize] = useState(() => parseInt(localStorage.getItem('vault_page_size')) || 10);
+  const [filters, setFilters] = useState({}); // { field_key: value }
+  const [openFilter, setOpenFilter] = useState(null); // 当前展开的筛选列 field_key
+  const [filterPos, setFilterPos] = useState({ top: 0, left: 0 }); // 筛选下拉位置
   const [loading, setLoading] = useState(true);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
@@ -349,12 +352,17 @@ export default function ProductPage() {
     setSelectedIds(new Set());
     setLoading(true);
     try {
-      const { data } = await api.get(`/records/product/${id}`, { params: { page, search, limit: pageSize } });
+      const params = { page, search, limit: pageSize };
+      const activeFilters = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+      if (Object.keys(activeFilters).length > 0) params.filters = JSON.stringify(activeFilters);
+      const { data } = await api.get(`/records/product/${id}`, { params });
       if (data.success) { setRecords(data.data); setPagination(data.pagination); }
     } catch {} finally { setLoading(false); }
-  }, [id, search, pageSize]);
+  }, [id, search, pageSize, filters]);
 
   useEffect(() => { fetchColumns(); }, [fetchColumns]);
+  // 切换产品时清空筛选
+  useEffect(() => { setFilters({}); setOpenFilter(null); }, [id]);
   useEffect(() => { const t = setTimeout(() => fetchRecords(), 300); return () => clearTimeout(t); }, [fetchRecords]);
 
   const toggleSelect = (id) => {
@@ -372,6 +380,15 @@ export default function ProductPage() {
       setSelectedIds(new Set(records.map(r => r.id)));
     }
   };
+
+  // 点击外部关闭筛选下拉
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest('[data-filter-panel]')) setOpenFilter(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handlePageSizeChange = (size) => {
     setPageSize(size);
@@ -622,8 +639,14 @@ export default function ProductPage() {
       {/* 搜索栏 */}
       <div className="px-8 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
         <div className="relative max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-          <input className="vault-input pl-9" placeholder="搜索标题、IP、账号等所有字段..."
+          {/* 搜索无内容时显示图标，有内容后图标隐藏，右侧显示清除按钮 */}
+          {!search && (
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          )}
+          <input
+            className="vault-input"
+            style={{ paddingLeft: search ? '0.85rem' : '2.25rem', paddingRight: search ? '2.25rem' : '0.85rem' }}
+            placeholder="搜索标题、IP、账号等所有字段..."
             value={search} onChange={e => setSearch(e.target.value)} />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2"
@@ -634,6 +657,30 @@ export default function ProductPage() {
         </div>
         {search && (
           <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>找到 {pagination.total || 0} 条匹配记录</p>
+        )}
+        {/* 活跃筛选标签 */}
+        {Object.keys(filters).length > 0 && (
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>筛选：</span>
+            {Object.entries(filters).map(([key, val]) => {
+              const col = columns.find(c => c.field_key === key);
+              return (
+                <span key={key} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                  style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                  {col?.field_label || key}: {val}
+                  <button onClick={() => setFilters(f => { const n = {...f}; delete n[key]; return n; })}
+                    style={{ color: 'var(--accent)', border: 'none', background: 'none', cursor: 'pointer', padding: 0, lineHeight: 1, marginLeft: 2 }}>
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+            <button onClick={() => setFilters({})}
+              className="text-xs"
+              style={{ color: 'var(--text-muted)', border: 'none', background: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              清除全部
+            </button>
+          </div>
         )}
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-3 mt-2 px-3 py-2 rounded-lg animate-fade-in"
@@ -688,19 +735,47 @@ export default function ProductPage() {
                       onChange={toggleSelectAll}
                       style={{ accentColor: 'var(--accent)', cursor: 'pointer', width: 14, height: 14 }} />
                   </th>
-                  {displayCols.map(col => (
-                    <th key={col.id}
-                      style={{ ...thStyle, cursor: 'grab', userSelect: 'none', width: col._isTitle ? 180 : undefined }}
-                      draggable
-                      onDragStart={e => handleDragStart(e, col.id)}
-                      onDragOver={e => handleDragOver(e, col.id)}
-                      onDrop={e => handleDrop(e, col.id)}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {col.field_label}
-                        {!!+col.is_sensitive && <span style={{ color: 'var(--warning)', fontSize: 10 }}>🔒</span>}
-                      </span>
-                    </th>
-                  ))}
+                  {displayCols.map(col => {
+                    const isSelect = col.field_type === 'select';
+                    const hasFilter = isSelect && filters[col.field_key];
+                    const isOpen = openFilter === col.field_key;
+                    const options = isSelect ? (() => { try { return JSON.parse(col.field_options || '[]'); } catch { return []; } })() : [];
+                    return (
+                      <th key={col.id}
+                        style={{ ...thStyle, cursor: 'grab', userSelect: 'none', width: col._isTitle ? 180 : undefined, position: 'relative' }}
+                        draggable
+                        onDragStart={e => handleDragStart(e, col.id)}
+                        onDragOver={e => handleDragOver(e, col.id)}
+                        onDrop={e => handleDrop(e, col.id)}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {col.field_label}
+                          {!!+col.is_sensitive && <span style={{ color: 'var(--warning)', fontSize: 10 }}>🔒</span>}
+                          {/* 下拉列筛选按钮 */}
+                          {isSelect && options.length > 0 && (
+                            <button
+                              data-filter-panel
+                              draggable={false}
+                              onClick={e => {
+                                e.stopPropagation();
+                                if (isOpen) { setOpenFilter(null); return; }
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setFilterPos({ top: rect.bottom + 4, left: rect.left });
+                                setOpenFilter(col.field_key);
+                              }}
+                              title={hasFilter ? `筛选：${filters[col.field_key]}` : '筛选'}
+                              style={{
+                                border: 'none', cursor: 'pointer', padding: '1px 3px',
+                                borderRadius: 4, display: 'flex', alignItems: 'center',
+                                color: hasFilter ? 'var(--accent)' : 'var(--text-muted)',
+                                background: hasFilter ? 'var(--accent-glow)' : 'transparent',
+                              }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                            </button>
+                          )}
+                        </span>
+                      </th>
+                    );
+                  })}
                   <th style={{ ...thStyle, width: 90 }}>操作</th>
                 </tr>
               </thead>
@@ -879,6 +954,36 @@ export default function ProductPage() {
           </div>
         )}
       </div>
+
+      {/* 筛选下拉面板（fixed 定位，不受 overflow 裁切） */}
+      {openFilter && (() => {
+        const col = columns.find(c => c.field_key === openFilter);
+        if (!col) return null;
+        const options = (() => { try { return JSON.parse(col.field_options || '[]'); } catch { return []; } })();
+        return (
+          <div data-filter-panel
+            style={{
+              position: 'fixed', top: filterPos.top, left: filterPos.left, zIndex: 9999,
+              background: 'var(--bg-card)', border: '1px solid var(--border-bright)',
+              borderRadius: 8, minWidth: 150, overflow: 'hidden',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.18)',
+            }}>
+            <button
+              onClick={() => { setFilters(f => { const n = {...f}; delete n[openFilter]; return n; }); setOpenFilter(null); }}
+              style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', background: !filters[openFilter] ? 'var(--accent-glow)' : 'transparent', color: !filters[openFilter] ? 'var(--accent)' : 'var(--text-dim)', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: !filters[openFilter] ? 600 : 400 }}>
+              全部
+            </button>
+            <div style={{ height: 1, background: 'var(--border)', margin: '0 10px' }} />
+            {options.map(opt => (
+              <button key={opt}
+                onClick={() => { setFilters(f => ({ ...f, [openFilter]: opt })); setOpenFilter(null); }}
+                style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', background: filters[openFilter] === opt ? 'var(--accent-glow)' : 'transparent', color: filters[openFilter] === opt ? 'var(--accent)' : 'var(--text-dim)', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: filters[openFilter] === opt ? 600 : 400, whiteSpace: 'nowrap' }}>
+                {opt}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {showRecordModal && (
         <RecordModal productId={id} columns={columns} record={editRecord}

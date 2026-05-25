@@ -3,10 +3,17 @@ const db = require('../config/database');
 const auth = require('../middleware/auth');
 const { encrypt, decrypt } = require('../config/crypto');
 
-// 获取产品下所有记录（带分页和全列搜索）
+// 获取产品下所有记录（带分页、全列搜索、下拉字段筛选）
 router.get('/product/:productId', auth, async (req, res) => {
-  const { page = 1, limit = 20, search = '' } = req.query;
+  const { page = 1, limit = 20, search = '', filters = '' } = req.query;
   const offset = (page - 1) * limit;
+
+  // 解析筛选条件 { field_key: value }
+  let filterMap = {};
+  if (filters) {
+    try { filterMap = JSON.parse(filters); } catch {}
+  }
+  const filterEntries = Object.entries(filterMap).filter(([, v]) => v !== '' && v != null);
 
   try {
     const [prod] = await db.query(
@@ -15,9 +22,18 @@ router.get('/product/:productId', auth, async (req, res) => {
     );
     if (!prod.length) return res.status(404).json({ success: false, message: '产品不存在' });
 
-    let recordIds;
+    // 获取列定义（用于 field_key -> column_id 映射）
+    const [allCols] = await db.query(
+      'SELECT id, field_key FROM column_definitions WHERE product_id = ?',
+      [req.params.productId]
+    );
+    const colKeyMap = {};
+    allCols.forEach(c => { colKeyMap[c.field_key] = c.id; });
+
+    let recordIds = null;
+
+    // 关键词搜索
     if (search) {
-      // 全列检索：标题 + 所有非敏感字段值
       const [matched] = await db.query(
         `SELECT DISTINCT r.id FROM records r
          LEFT JOIN record_values rv ON rv.record_id = r.id
@@ -26,16 +42,37 @@ router.get('/product/:productId', auth, async (req, res) => {
            AND (r.title LIKE ? OR rv.field_value LIKE ?)`,
         [req.params.productId, `%${search}%`, `%${search}%`]
       );
-      recordIds = matched.map(r => r.id);
-      if (recordIds.length === 0) {
-        return res.json({ success: true, data: [], pagination: { total: 0, page: 1, limit: parseInt(limit), pages: 0 } });
+      recordIds = new Set(matched.map(r => r.id));
+    }
+
+    // 下拉字段筛选（每个筛选条件取交集）
+    for (const [fieldKey, value] of filterEntries) {
+      const colId = colKeyMap[fieldKey];
+      if (!colId) continue;
+      const [matched] = await db.query(
+        `SELECT DISTINCT r.id FROM records r
+         JOIN record_values rv ON rv.record_id = r.id
+         WHERE r.product_id = ? AND rv.column_id = ? AND rv.field_value = ?`,
+        [req.params.productId, colId, value]
+      );
+      const matchedIds = new Set(matched.map(r => r.id));
+      if (recordIds === null) {
+        recordIds = matchedIds;
+      } else {
+        recordIds = new Set([...recordIds].filter(id => matchedIds.has(id)));
       }
     }
 
-    const whereCond = search
-      ? `WHERE r.product_id = ? AND r.id IN (${recordIds.map(() => '?').join(',')})`
+    // 无结果快速返回
+    if (recordIds !== null && recordIds.size === 0) {
+      return res.json({ success: true, data: [], pagination: { total: 0, page: 1, limit: parseInt(limit), pages: 0 } });
+    }
+
+    const idList = recordIds !== null ? [...recordIds] : null;
+    const whereCond = idList
+      ? `WHERE r.product_id = ? AND r.id IN (${idList.map(() => '?').join(',')})`
       : `WHERE r.product_id = ?`;
-    const baseParams = search ? [req.params.productId, ...recordIds] : [req.params.productId];
+    const baseParams = idList ? [req.params.productId, ...idList] : [req.params.productId];
 
     const [records] = await db.query(
       `SELECT r.id, r.title, r.created_at, r.updated_at FROM records r
@@ -62,23 +99,9 @@ router.get('/product/:productId', auth, async (req, res) => {
       baseParams
     );
 
-    // 读取标题列配置
-    const [[titleLabel]] = await db.query(
-      "SELECT `value` FROM system_settings WHERE `key` = ?",
-      [`title_label_${req.params.productId}`]
-    );
-    const [[titleHidden]] = await db.query(
-      "SELECT `value` FROM system_settings WHERE `key` = ?",
-      [`title_hidden_${req.params.productId}`]
-    );
-
     res.json({
       success: true,
       data: records,
-      title_config: {
-        label: titleLabel?.value || '标题',
-        hidden: titleHidden?.value === '1',
-      },
       pagination: {
         total: countRes[0].total,
         page: parseInt(page),
