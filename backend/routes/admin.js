@@ -147,9 +147,18 @@ router.get('/settings', async (req, res) => {
   }
 });
 
+const ALLOWED_SETTING_KEYS = new Set([
+  'allow_register',
+  'api_rate_limit_enabled', 'api_rate_limit_max', 'api_rate_limit_window_min',
+  'login_rate_limit_enabled', 'login_rate_limit_max', 'login_rate_limit_window_min',
+]);
+
 router.put('/settings', async (req, res) => {
   const { key, value } = req.body;
   if (!key) return res.status(400).json({ success: false, message: 'key 不能为空' });
+  if (!ALLOWED_SETTING_KEYS.has(key)) {
+    return res.status(400).json({ success: false, message: '不允许的设置项' });
+  }
   try {
     await db.query(
       'INSERT INTO system_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',

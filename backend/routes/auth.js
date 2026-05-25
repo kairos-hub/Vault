@@ -72,6 +72,8 @@ router.post('/register', async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ success: false, message: '用户名和密码不能为空' });
   }
+  if (username.length > 50) return res.status(400).json({ success: false, message: '用户名不能超过50个字符' });
+  if (password.length > 200) return res.status(400).json({ success: false, message: '密码不能超过200个字符' });
   try {
     const allowed = await isRegisterAllowed();
     if (!allowed) {

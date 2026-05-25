@@ -1,7 +1,11 @@
 const CryptoJS = require('crypto-js');
 require('dotenv').config();
 
-const ENCRYPT_KEY = process.env.ENCRYPT_KEY || 'default_key_change_in_production!!';
+const ENCRYPT_KEY = process.env.ENCRYPT_KEY;
+if (!ENCRYPT_KEY || ENCRYPT_KEY.length < 16) {
+  console.error('❌ 启动失败：ENCRYPT_KEY 未配置或长度不足16位，请在 .env 中设置');
+  process.exit(1);
+}
 
 /**
  * 加密敏感字段（密码等）

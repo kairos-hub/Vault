@@ -5,8 +5,11 @@ const { encrypt, decrypt } = require('../config/crypto');
 
 // 获取产品下所有记录（带分页、全列搜索、下拉字段筛选）
 router.get('/product/:productId', auth, async (req, res) => {
-  const { page = 1, limit = 20, search = '', filters = '' } = req.query;
-  const offset = (page - 1) * limit;
+  const page   = Math.max(1, parseInt(req.query.page) || 1);
+  const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+  const search  = req.query.search || '';
+  const filters = req.query.filters || '';
+  const offset  = (page - 1) * limit;
 
   // 解析筛选条件 { field_key: value }
   let filterMap = {};
@@ -389,6 +392,9 @@ router.post('/product/:productId/import', auth, async (req, res) => {
   const { rows } = req.body; // [{ title, ...fieldValues }]
   if (!Array.isArray(rows) || rows.length === 0) {
     return res.status(400).json({ success: false, message: '导入数据不能为空' });
+  }
+  if (rows.length > 2000) {
+    return res.status(400).json({ success: false, message: '单次最多导入 2000 条记录' });
   }
 
   try {

@@ -9,16 +9,18 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '4mb' }));
+app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 
 // 获取真实 IP
 function getRealIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  let ip = forwarded
-    ? forwarded.split(',')[0].trim()
-    : req.socket?.remoteAddress || '0.0.0.0';
-  return ip.replace(/^::ffff:/, '');
+  // 仅在明确配置了反向代理时才信任 X-Forwarded-For
+  // 否则直接用 socket 地址（不可被客户端伪造）
+  if (process.env.TRUST_PROXY === 'true') {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) return forwarded.split(',')[0].trim().replace(/^::ffff:/, '');
+  }
+  return (req.socket?.remoteAddress || '0.0.0.0').replace(/^::ffff:/, '');
 }
 
 app.use((req, res, next) => {
