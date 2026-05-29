@@ -142,28 +142,56 @@ function ExportDropdown({ exporting, selectedCount, onExportAll, onExportSelecte
 
 // ── CSV 解析 ───────────────────────────────────────────────
 function parseCSV(text) {
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const parseRow = (line) => {
-    const cols = []; let cur = ''; let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
-      else cur += ch;
+  // 逐字符解析，正确处理字段内含换行符的情况
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const results = [];
+  let headers = null;
+  let i = 0;
+
+  while (i <= normalized.length) {
+    const row = [];
+    // 解析一行（可能跨越多个物理换行，如字段内含 \n）
+    while (i <= normalized.length) {
+      if (i === normalized.length || (normalized[i] === '\n' && !row.currentInQuote)) {
+        i++; // 跳过换行
+        break;
+      }
+      if (normalized[i] === '"') {
+        // 带引号字段
+        i++;
+        let field = '';
+        while (i < normalized.length) {
+          if (normalized[i] === '"') {
+            if (normalized[i + 1] === '"') { field += '"'; i += 2; }
+            else { i++; break; }
+          } else {
+            field += normalized[i]; i++;
+          }
+        }
+        row.push(field);
+        if (normalized[i] === ',') i++;
+      } else {
+        // 不带引号字段
+        let field = '';
+        while (i < normalized.length && normalized[i] !== ',' && normalized[i] !== '\n') {
+          field += normalized[i]; i++;
+        }
+        row.push(field);
+        if (normalized[i] === ',') i++;
+      }
     }
-    cols.push(cur);
-    return cols;
-  };
-  const headers = parseRow(lines[0]);
-  return lines.slice(1).map(line => {
-    const vals = parseRow(line);
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
-    return obj;
-  });
+
+    if (row.length === 0 || (row.length === 1 && row[0] === '')) continue;
+
+    if (!headers) {
+      headers = row;
+    } else {
+      const obj = {};
+      headers.forEach((h, idx) => { obj[h] = row[idx] ?? ''; });
+      results.push(obj);
+    }
+  }
+  return results;
 }
 
 // ── 导入弹窗 ───────────────────────────────────────────────

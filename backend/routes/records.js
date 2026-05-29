@@ -364,11 +364,11 @@ router.get('/product/:productId/export', auth, async (req, res) => {
 
     // 生成 CSV（标题列始终第一列）
     const escapeVal = (val) => {
-      if (!val) return '';
-      const s = String(val);
-      return s.includes(',') || s.includes('"') || s.includes('\n')
-        ? `"${s.replace(/"/g, '""')}"`
-        : s;
+      if (val === null || val === undefined || val === '') return '""';
+      // 先把所有换行符替换成空格，防止破坏 CSV 行结构
+      const s = String(val).replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ');
+      // 所有值统一加双引号，内部双引号转义为两个双引号
+      return `"${s.replace(/"/g, '""')}"`;
     };
     const headers = ['标题', ...orderedCols.map(c => c.field_label)];
     const rows = records.map(r => [
