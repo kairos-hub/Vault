@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 亮色主题（默认） */
+/* 亮色主题（默认） 
 :root {
   --bg: #f1f5f9;
   --bg-card: #ffffff;
@@ -17,6 +17,23 @@
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
+}
+*/
+
+:root {
+  --bg: #f0ede8;           /* 米灰暖色背景 */
+  --bg-card: #f8f6f2;      /* 暖白卡片 */
+  --bg-hover: #ebe8e2;
+  --border: #ddd9d2;
+  --border-bright: #ccc7bf;
+  --accent: #5a5fcf;
+  --accent-glow: rgba(90, 95, 207, 0.12);
+  --text: #2a2520;         /* 暖黑文字 */
+  --text-muted: #8a8278;
+  --text-dim: #5a5248;
+  --success: #0e9e73;
+  --warning: #e08c00;
+  --danger: #d94040;
 }
 
 /* 深色主题 */
