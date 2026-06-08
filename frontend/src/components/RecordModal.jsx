@@ -52,7 +52,7 @@ export default function RecordModal({ productId, columns, record, onClose, onSav
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
+>
       <div className="vault-card w-full max-w-lg animate-fade-in flex flex-col"
         style={{ maxHeight: '85vh' }}>
         {/* 头 */}
