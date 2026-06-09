@@ -28,22 +28,22 @@ export default function Layout() {
     } catch {}
   };
 
-  useEffect(() => {
-    fetchProducts();
+  const fetchSiteInfo = () => {
     api.get('/auth/site-info').then(({ data }) => {
       if (!data.success) return;
       setSiteInfo(data.data);
-      // 动态更新 favicon
       if (data.data.favicon_url) {
         let link = document.querySelector("link[rel~='icon']");
         if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
         link.href = data.data.favicon_url;
       }
-      // 动态更新页面标题
-      if (data.data.site_name) {
-        document.title = data.data.site_name;
-      }
+      if (data.data.site_name) document.title = data.data.site_name;
     }).catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchProducts();
+    fetchSiteInfo();
   }, []);
 
   useEffect(() => {
@@ -304,7 +304,7 @@ export default function Layout() {
 
       {/* 主内容 */}
       <main className="flex-1 overflow-auto">
-        <Outlet context={{ products, onProductsChange: fetchProducts }} />
+        <Outlet context={{ products, onProductsChange: fetchProducts, onSiteInfoChange: fetchSiteInfo }} />
       </main>
 
       {showModal && (

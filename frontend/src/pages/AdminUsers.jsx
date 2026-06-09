@@ -14,6 +14,7 @@ const SITE_ICONS = [
   { value: 'key',      label: 'Key',   Icon: Key },
   { value: 'folder',   label: '文件夹', Icon: Folder },
 ];
+import { useOutletContext } from 'react-router-dom';
 import api from '../utils/api';
 import useAuthStore from '../utils/authStore';
 
@@ -507,7 +508,7 @@ function RateLimitPanel() {
 }
 
 // ── 品牌设置卡片 ──────────────────────────────────────────
-function SiteBrandingCard({ settings, onSave }) {
+function SiteBrandingCard({ settings, onSave, onSiteInfoChange }) {
   const [name, setName] = useState(settings.site_name || 'Vault');
   const [icon, setIcon] = useState(settings.site_icon || 'shield');
   const [iconUrl, setIconUrl] = useState(settings.site_icon_url || '');
@@ -531,12 +532,18 @@ function SiteBrandingCard({ settings, onSave }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/admin/settings', { key: 'site_name', value: name.trim() || 'Vault' });
+      const finalName = name.trim() || 'Vault';
+      await api.put('/admin/settings', { key: 'site_name', value: finalName });
       await api.put('/admin/settings', { key: 'site_icon', value: icon });
-      onSave('site_name', name.trim() || 'Vault');
+      await api.put('/admin/settings', { key: 'site_icon_url', value: iconUrl });
+      await api.put('/admin/settings', { key: 'favicon_url', value: faviconUrl });
+      onSave('site_name', finalName);
       onSave('site_icon', icon);
+      onSave('site_icon_url', iconUrl);
+      onSave('favicon_url', faviconUrl);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      onSiteInfoChange?.();
     } catch { alert('保存失败'); }
     finally { setSaving(false); }
   };
@@ -549,13 +556,8 @@ function SiteBrandingCard({ settings, onSave }) {
     try {
       const fd = new FormData();
       fd.append('icon', file);
-      const { data } = await api.post('/admin/settings/upload-icon', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      if (data.success) {
-        setIconUrl(data.url);
-        onSave('site_icon_url', data.url);
-      }
+      const { data } = await api.post('/admin/settings/upload-icon', fd);
+      if (data.success) setIconUrl(data.url);
     } catch (err) {
       alert(err.response?.data?.message || '上传失败');
     } finally { setUploading(false); }
@@ -564,8 +566,10 @@ function SiteBrandingCard({ settings, onSave }) {
   const handleClearCustom = async () => {
     try {
       await api.delete('/admin/settings/upload-icon');
+      await api.put('/admin/settings', { key: 'site_icon_url', value: '' });
       setIconUrl('');
       onSave('site_icon_url', '');
+      onSiteInfoChange?.();
     } catch { alert('清除失败'); }
   };
 
@@ -577,17 +581,8 @@ function SiteBrandingCard({ settings, onSave }) {
     try {
       const fd = new FormData();
       fd.append('favicon', file);
-      const { data } = await api.post('/admin/settings/upload-favicon', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      if (data.success) {
-        setFaviconUrl(data.url);
-        onSave('favicon_url', data.url);
-        // 当前页面立即生效
-        let link = document.querySelector("link[rel~='icon']");
-        if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
-        link.href = data.url;
-      }
+      const { data } = await api.post('/admin/settings/upload-favicon', fd);
+      if (data.success) setFaviconUrl(data.url);
     } catch (err) {
       alert(err.response?.data?.message || '上传失败');
     } finally { setFaviconUploading(false); }
@@ -596,11 +591,10 @@ function SiteBrandingCard({ settings, onSave }) {
   const handleClearFavicon = async () => {
     try {
       await api.delete('/admin/settings/upload-favicon');
+      await api.put('/admin/settings', { key: 'favicon_url', value: '' });
       setFaviconUrl('');
       onSave('favicon_url', '');
-      // 恢复默认 favicon
-      const link = document.querySelector("link[rel~='icon']");
-      if (link) link.href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M16 5 L26 9 L26 17 C26 22 21 26.5 16 28 C11 26.5 6 22 6 17 L6 9 Z' fill='white' opacity='0.95'/%3E%3Cpath d='M13 16 L15.5 18.5 L20 13.5' stroke='%236366f1' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E";
+      onSiteInfoChange?.();
     } catch { alert('清除失败'); }
   };
 
@@ -777,6 +771,7 @@ export default function AdminUsers() {
   const [togglingId, setTogglingId] = useState(null);
   const [togglingAdminId, setTogglingAdminId] = useState(null);
   const currentUser = useAuthStore(s => s.user);
+  const { onSiteInfoChange } = useOutletContext() || {};
 
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -1066,7 +1061,7 @@ export default function AdminUsers() {
           </div>
 
           {/* 品牌设置 */}
-          <SiteBrandingCard settings={settings} onSave={(key, value) => setSettings(s => ({ ...s, [key]: value }))} />
+          <SiteBrandingCard settings={settings} onSave={(key, value) => setSettings(s => ({ ...s, [key]: value }))} onSiteInfoChange={onSiteInfoChange} />
         </div>
       )}
 

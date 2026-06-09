@@ -49,6 +49,22 @@
 
 ---
 
+## 界面预览
+
+### 总览
+![总览](docs/vault1.png)
+
+### 用户管理
+![用户管理](docs/vault2.png)
+
+### 限流管理
+![限流管理](docs/vault3.png)
+
+### 系统设置
+![系统设置](docs/vault4.png)
+
+---
+
 ## 技术栈
 
 | 层级 | 技术 |
@@ -170,6 +186,12 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # 用户上传文件（品牌图标、Favicon 等）
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
     }
 }
 ```
