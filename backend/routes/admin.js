@@ -12,37 +12,34 @@ const admin = require('../middleware/admin');
 const UPLOADS_DIR = path.join(__dirname, '../uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
 
-const ICON_MIME = /^image\/(png|jpe?g|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon)$/;
+// 用 memoryStorage 接收文件，然后按魔数字节确定真实格式再落盘
+const memUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 512 * 1024 } });
 
-const iconUpload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOADS_DIR,
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase() || '.png';
-      cb(null, `site_icon${ext}`);
-    },
-  }),
-  limits: { fileSize: 512 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (ICON_MIME.test(file.mimetype)) return cb(null, true);
-    cb(new Error('仅支持 PNG / JPG / GIF / WebP / SVG / ICO'));
-  },
-});
+// 从 Buffer 头部魔数检测真实图片类型
+function detectImageType(buf) {
+  if (!buf || buf.length < 4) return null;
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47)
+    return { ext: '.png',  mime: 'image/png' };
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)
+    return { ext: '.jpg',  mime: 'image/jpeg' };
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46)
+    return { ext: '.gif',  mime: 'image/gif' };
+  if (buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP')
+    return { ext: '.webp', mime: 'image/webp' };
+  if (buf[0] === 0x3c) // '<' SVG 文本
+    return { ext: '.svg',  mime: 'image/svg+xml' };
+  if (buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01 && buf[3] === 0x00)
+    return { ext: '.ico',  mime: 'image/x-icon' };
+  return null;
+}
 
-const faviconUpload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOADS_DIR,
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase() || '.ico';
-      cb(null, `favicon${ext}`);
-    },
-  }),
-  limits: { fileSize: 512 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (ICON_MIME.test(file.mimetype)) return cb(null, true);
-    cb(new Error('仅支持 ICO / PNG / SVG / WebP'));
-  },
-});
+function cleanOldFiles(prefix, keepExt) {
+  ['png','jpg','jpeg','gif','webp','svg','ico'].forEach(ext => {
+    if (`.${ext}` === keepExt) return;
+    const p = path.join(UPLOADS_DIR, `${prefix}.${ext}`);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  });
+}
 
 router.use(auth, admin);
 
@@ -304,27 +301,20 @@ router.delete('/rate-limits', async (req, res) => {
 
 // ── 上传自定义品牌图标 ────────────────────────────────────
 router.post('/settings/upload-icon', (req, res) => {
-  iconUpload.single('icon')(req, res, async (err) => {
+  memUpload.single('icon')(req, res, async (err) => {
     if (err) return res.status(400).json({ success: false, message: err.message });
     if (!req.file) return res.status(400).json({ success: false, message: '未收到文件' });
 
-    // 删除同名其他扩展名的旧文件
-    const newFile = req.file.filename;
-    ['png','jpg','jpeg','gif','webp','svg'].forEach(ext => {
-      const old = path.join(UPLOADS_DIR, `site_icon.${ext}`);
-      if (fs.existsSync(old) && `site_icon.${ext}` !== newFile) fs.unlinkSync(old);
-    });
+    const type = detectImageType(req.file.buffer);
+    if (!type) return res.status(400).json({ success: false, message: '无法识别的图片格式，请上传 PNG / JPG / GIF / WebP / SVG' });
+    if (type.ext === '.ico') return res.status(400).json({ success: false, message: 'ICO 格式不支持作为品牌图标，请上传 PNG / JPG / WebP / SVG' });
 
-    const url = `/uploads/${newFile}`;
-    try {
-      await db.query(
-        'INSERT INTO system_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
-        ['site_icon_url', url, url]
-      );
-      res.json({ success: true, url });
-    } catch (e) {
-      res.status(500).json({ success: false, message: e.message });
-    }
+    const filename = `site_icon${type.ext}`;
+    cleanOldFiles('site_icon', type.ext);
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+
+    const url = `/uploads/${filename}?t=${Date.now()}`;
+    res.json({ success: true, url });
   });
 });
 
@@ -333,7 +323,7 @@ router.delete('/settings/upload-icon', async (req, res) => {
   try {
     const [rows] = await db.query("SELECT `value` FROM system_settings WHERE `key` = 'site_icon_url'");
     if (rows.length && rows[0].value) {
-      const filePath = path.join(__dirname, '..', rows[0].value);
+      const filePath = path.join(__dirname, '..', rows[0].value.split('?')[0]);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
     await db.query(
@@ -347,26 +337,19 @@ router.delete('/settings/upload-icon', async (req, res) => {
 
 // ── 上传 Favicon ──────────────────────────────────────────
 router.post('/settings/upload-favicon', (req, res) => {
-  faviconUpload.single('favicon')(req, res, async (err) => {
+  memUpload.single('favicon')(req, res, async (err) => {
     if (err) return res.status(400).json({ success: false, message: err.message });
     if (!req.file) return res.status(400).json({ success: false, message: '未收到文件' });
 
-    const newFile = req.file.filename;
-    ['ico', 'png', 'svg', 'webp', 'jpg', 'jpeg', 'gif'].forEach(ext => {
-      const old = path.join(UPLOADS_DIR, `favicon.${ext}`);
-      if (fs.existsSync(old) && `favicon.${ext}` !== newFile) fs.unlinkSync(old);
-    });
+    const type = detectImageType(req.file.buffer);
+    if (!type) return res.status(400).json({ success: false, message: '无法识别的图片格式，请上传 ICO / PNG / SVG / WebP' });
 
-    const url = `/uploads/${newFile}`;
-    try {
-      await db.query(
-        'INSERT INTO system_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
-        ['favicon_url', url, url]
-      );
-      res.json({ success: true, url });
-    } catch (e) {
-      res.status(500).json({ success: false, message: e.message });
-    }
+    const filename = `favicon${type.ext}`;
+    cleanOldFiles('favicon', type.ext);
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+
+    const url = `/uploads/${filename}?t=${Date.now()}`;
+    res.json({ success: true, url });
   });
 });
 
@@ -375,7 +358,7 @@ router.delete('/settings/upload-favicon', async (req, res) => {
   try {
     const [rows] = await db.query("SELECT `value` FROM system_settings WHERE `key` = 'favicon_url'");
     if (rows.length && rows[0].value) {
-      const filePath = path.join(__dirname, '..', rows[0].value);
+      const filePath = path.join(__dirname, '..', rows[0].value.split('?')[0]);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
     await db.query(
