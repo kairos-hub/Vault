@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Shield, Plus, LogOut, Server, Database, Globe, Key, Folder, Sun, Moon, Trash2, Users } from 'lucide-react';
+import { Shield, Plus, LogOut, Server, Database, Globe, Key, Folder, Sun, Moon, Trash2, Users, Pencil } from 'lucide-react';
 import api from '../utils/api';
 import useAuthStore from '../utils/authStore';
 import ProductModal from './ProductModal';
 
 const ICONS = { server: Server, database: Database, globe: Globe, key: Key, folder: Folder };
+const SITE_ICONS = { shield: Shield, server: Server, database: Database, globe: Globe, key: Key, folder: Folder };
 
 export default function Layout() {
   const [products, setProducts] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [editProduct, setEditProduct] = useState(null);
+  const [siteInfo, setSiteInfo] = useState({ site_name: 'Vault', site_icon: 'shield', site_icon_url: '', favicon_url: '' });
   const [theme, setTheme] = useState(() => localStorage.getItem('vault_theme') || 'light');
   const [hoveredProduct, setHoveredProduct] = useState(null);
   const dragRef = useRef(null);
@@ -25,7 +28,23 @@ export default function Layout() {
     } catch {}
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => {
+    fetchProducts();
+    api.get('/auth/site-info').then(({ data }) => {
+      if (!data.success) return;
+      setSiteInfo(data.data);
+      // 动态更新 favicon
+      if (data.data.favicon_url) {
+        let link = document.querySelector("link[rel~='icon']");
+        if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+        link.href = data.data.favicon_url;
+      }
+      // 动态更新页面标题
+      if (data.data.site_name) {
+        document.title = data.data.site_name;
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -137,11 +156,15 @@ export default function Layout() {
       <aside className="w-60 flex flex-col border-r" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-            <Shield size={14} color="white" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+            style={siteInfo.site_icon_url ? {} : { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+            {siteInfo.site_icon_url
+              ? <img src={siteInfo.site_icon_url} alt="logo" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 8 }} />
+              : (() => { const I = SITE_ICONS[siteInfo.site_icon] || Shield; return <I size={14} color="white" />; })()}
           </div>
-          <span className="font-semibold text-sm tracking-tight" style={{ color: 'var(--text)' }}>Vault</span>
+          <span className="font-semibold text-sm tracking-tight truncate" style={{ color: 'var(--text)' }}>
+            {siteInfo.site_name || 'Vault'}
+          </span>
         </div>
 
         {/* 导航 */}
@@ -213,14 +236,24 @@ export default function Layout() {
                   </div>
                   <span className="flex-1 truncate" style={{ pointerEvents: 'none' }}>{p.name}</span>
                   {isHovered ? (
-                    <button
-                      draggable={false}
-                      onClick={e => handleDeleteProduct(e, p.id)}
-                      title="删除产品"
-                      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                      style={{ color: 'var(--danger)', border: 'none', background: 'rgba(239,68,68,0.1)', cursor: 'pointer' }}>
-                      <Trash2 size={11} />
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        draggable={false}
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProduct(p); }}
+                        title="编辑产品"
+                        className="w-5 h-5 rounded flex items-center justify-center"
+                        style={{ color: 'var(--text-muted)', border: 'none', background: 'var(--bg-hover)', cursor: 'pointer' }}>
+                        <Pencil size={10} />
+                      </button>
+                      <button
+                        draggable={false}
+                        onClick={e => handleDeleteProduct(e, p.id)}
+                        title="删除产品"
+                        className="w-5 h-5 rounded flex items-center justify-center"
+                        style={{ color: 'var(--danger)', border: 'none', background: 'rgba(239,68,68,0.1)', cursor: 'pointer' }}>
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
                   ) : (
                     <span className="text-xs px-1.5 rounded-full flex-shrink-0"
                       style={{ background: 'var(--border-bright)', color: 'var(--text-muted)' }}>
@@ -276,6 +309,9 @@ export default function Layout() {
 
       {showModal && (
         <ProductModal onClose={() => setShowModal(false)} onSave={() => { fetchProducts(); setShowModal(false); }} />
+      )}
+      {editProduct && (
+        <ProductModal product={editProduct} onClose={() => setEditProduct(null)} onSave={() => { fetchProducts(); setEditProduct(null); }} />
       )}
     </div>
   );

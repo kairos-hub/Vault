@@ -1,10 +1,48 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../config/database');
 const { initDefaultProducts } = require('../config/defaultProducts');
 const { clearCache } = require('../config/rateLimitConfig');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
+
+const UPLOADS_DIR = path.join(__dirname, '../uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
+
+const ICON_MIME = /^image\/(png|jpe?g|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon)$/;
+
+const iconUpload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOADS_DIR,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.png';
+      cb(null, `site_icon${ext}`);
+    },
+  }),
+  limits: { fileSize: 512 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ICON_MIME.test(file.mimetype)) return cb(null, true);
+    cb(new Error('仅支持 PNG / JPG / GIF / WebP / SVG / ICO'));
+  },
+});
+
+const faviconUpload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOADS_DIR,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.ico';
+      cb(null, `favicon${ext}`);
+    },
+  }),
+  limits: { fileSize: 512 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ICON_MIME.test(file.mimetype)) return cb(null, true);
+    cb(new Error('仅支持 ICO / PNG / SVG / WebP'));
+  },
+});
 
 router.use(auth, admin);
 
@@ -149,6 +187,7 @@ router.get('/settings', async (req, res) => {
 
 const ALLOWED_SETTING_KEYS = new Set([
   'allow_register',
+  'site_name', 'site_icon', 'site_icon_url', 'favicon_url',
   'api_rate_limit_enabled', 'api_rate_limit_max', 'api_rate_limit_window_min',
   'login_rate_limit_enabled', 'login_rate_limit_max', 'login_rate_limit_window_min',
 ]);
@@ -260,6 +299,91 @@ router.delete('/rate-limits', async (req, res) => {
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── 上传自定义品牌图标 ────────────────────────────────────
+router.post('/settings/upload-icon', (req, res) => {
+  iconUpload.single('icon')(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    if (!req.file) return res.status(400).json({ success: false, message: '未收到文件' });
+
+    // 删除同名其他扩展名的旧文件
+    const newFile = req.file.filename;
+    ['png','jpg','jpeg','gif','webp','svg'].forEach(ext => {
+      const old = path.join(UPLOADS_DIR, `site_icon.${ext}`);
+      if (fs.existsSync(old) && `site_icon.${ext}` !== newFile) fs.unlinkSync(old);
+    });
+
+    const url = `/uploads/${newFile}`;
+    try {
+      await db.query(
+        'INSERT INTO system_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
+        ['site_icon_url', url, url]
+      );
+      res.json({ success: true, url });
+    } catch (e) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  });
+});
+
+// ── 清除自定义品牌图标 ────────────────────────────────────
+router.delete('/settings/upload-icon', async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT `value` FROM system_settings WHERE `key` = 'site_icon_url'");
+    if (rows.length && rows[0].value) {
+      const filePath = path.join(__dirname, '..', rows[0].value);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    await db.query(
+      "INSERT INTO system_settings (`key`, `value`) VALUES ('site_icon_url', '') ON DUPLICATE KEY UPDATE `value` = ''"
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── 上传 Favicon ──────────────────────────────────────────
+router.post('/settings/upload-favicon', (req, res) => {
+  faviconUpload.single('favicon')(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    if (!req.file) return res.status(400).json({ success: false, message: '未收到文件' });
+
+    const newFile = req.file.filename;
+    ['ico', 'png', 'svg', 'webp', 'jpg', 'jpeg', 'gif'].forEach(ext => {
+      const old = path.join(UPLOADS_DIR, `favicon.${ext}`);
+      if (fs.existsSync(old) && `favicon.${ext}` !== newFile) fs.unlinkSync(old);
+    });
+
+    const url = `/uploads/${newFile}`;
+    try {
+      await db.query(
+        'INSERT INTO system_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
+        ['favicon_url', url, url]
+      );
+      res.json({ success: true, url });
+    } catch (e) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  });
+});
+
+// ── 清除 Favicon ──────────────────────────────────────────
+router.delete('/settings/upload-favicon', async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT `value` FROM system_settings WHERE `key` = 'favicon_url'");
+    if (rows.length && rows[0].value) {
+      const filePath = path.join(__dirname, '..', rows[0].value);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    await db.query(
+      "INSERT INTO system_settings (`key`, `value`) VALUES ('favicon_url', '') ON DUPLICATE KEY UPDATE `value` = ''"
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 

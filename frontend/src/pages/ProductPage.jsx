@@ -425,14 +425,20 @@ export default function ProductPage() {
 
   const handleReveal = async (recordId, fieldKey) => {
     const key = `${recordId}_${fieldKey}`;
-    if (revealedFields[key]) {
+    if (key in revealedFields) {
       setRevealedFields(prev => { const n = { ...prev }; delete n[key]; return n; });
       return;
     }
     try {
       const { data } = await api.post(`/records/${recordId}/decrypt`, { field_key: fieldKey });
-      if (data.success) setRevealedFields(prev => ({ ...prev, [key]: data.value }));
-    } catch {}
+      if (data.success) {
+        setRevealedFields(prev => ({ ...prev, [key]: data.value ?? '' }));
+      } else {
+        alert(data.message || '解密失败');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || '解密请求失败');
+    }
   };
 
   const handleCopy = async (text, fieldId) => {
@@ -501,7 +507,7 @@ export default function ProductPage() {
   const Icon = ICONS[product?.icon] || Folder;
 
   // 所有可显示列（含虚拟标题列）
-  const allCols = [TITLE_COL, ...columns.filter(c => c.field_type !== 'textarea')];
+  const allCols = [TITLE_COL, ...columns];
 
   // 按 colOrder 排序（colOrder 里包含 '__title__'）
   const allDisplayCols = colOrder
@@ -835,10 +841,11 @@ export default function ProductPage() {
                       );
                       const valObj = record.values?.find(v => v.field_key === col.field_key);
                       const fkey = `${record.id}_${col.field_key}`;
+                      const isRevealed = fkey in revealedFields;
                       const revealed = revealedFields[fkey];
                       const isSensitive = !!+col.is_sensitive;
-                      const rawVal = isSensitive ? (revealed || null) : (valObj?.field_value || '');
-                      const displayVal = isSensitive ? (revealed || '••••••••') : (rawVal || '—');
+                      const rawVal = isSensitive ? (isRevealed ? revealed : null) : (valObj?.field_value || '');
+                      const displayVal = isSensitive ? (isRevealed ? (revealed || '（空）') : '••••••••') : (rawVal || '—');
 
                       return (
                         <td key={col.id} style={tdStyle}>
@@ -857,7 +864,7 @@ export default function ProductPage() {
                                 </a>
                               </Tooltip>
                             ) : (
-                              <Tooltip content={isSensitive ? (revealed || null) : (valObj?.field_value || null)}>
+                              <Tooltip content={isSensitive ? (isRevealed ? revealed : null) : (valObj?.field_value || null)}>
                                 <span style={{
                                   fontSize: '0.88rem',
                                   color: isSensitive ? (revealed ? 'var(--text)' : 'var(--text-muted)') : 'var(--text-dim)',
@@ -877,9 +884,9 @@ export default function ProductPage() {
                               <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                                 <button onClick={() => handleReveal(record.id, col.field_key)}
                                   style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: 'none', background: 'none', cursor: 'pointer', borderRadius: 4 }}>
-                                  {revealed ? <EyeOff size={12} /> : <Eye size={12} />}
+                                  {isRevealed ? <EyeOff size={12} /> : <Eye size={12} />}
                                 </button>
-                                {revealed && (
+                                {isRevealed && revealed && (
                                   <button onClick={() => handleCopy(revealed, fkey)}
                                     style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: copiedField === fkey ? 'var(--success)' : 'var(--text-muted)', border: 'none', background: 'none', cursor: 'pointer', borderRadius: 4 }}>
                                     {copiedField === fkey ? <Check size={12} /> : <Copy size={12} />}
@@ -1025,7 +1032,7 @@ export default function ProductPage() {
       {showImportModal && (
         <ImportModal productId={id} columns={columns}
           onClose={() => setShowImportModal(false)}
-          onDone={() => fetchRecords()} />
+          onDone={() => { fetchRecords(); onProductsChange(); }} />
       )}
     </div>
   );

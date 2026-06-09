@@ -1,9 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Trash2, KeyRound, RefreshCw, Crown, UserX, UserCheck,
   X, AlertTriangle, Plus, Shield, ShieldOff, ToggleLeft, ToggleRight,
-  Wifi, WifiOff, Ban, CheckCircle2, Clock, ChevronDown, ChevronUp, Trash
+  Wifi, WifiOff, Ban, CheckCircle2, Clock, ChevronDown, ChevronUp, Trash,
+  Server, Database, Globe, Key, Folder
 } from 'lucide-react';
+
+const SITE_ICONS = [
+  { value: 'shield',   label: '盾牌',  Icon: Shield },
+  { value: 'server',   label: '服务器', Icon: Server },
+  { value: 'database', label: '数据库', Icon: Database },
+  { value: 'globe',    label: '网站',  Icon: Globe },
+  { value: 'key',      label: 'Key',   Icon: Key },
+  { value: 'folder',   label: '文件夹', Icon: Folder },
+];
 import api from '../utils/api';
 import useAuthStore from '../utils/authStore';
 
@@ -496,6 +506,258 @@ function RateLimitPanel() {
   );
 }
 
+// ── 品牌设置卡片 ──────────────────────────────────────────
+function SiteBrandingCard({ settings, onSave }) {
+  const [name, setName] = useState(settings.site_name || 'Vault');
+  const [icon, setIcon] = useState(settings.site_icon || 'shield');
+  const [iconUrl, setIconUrl] = useState(settings.site_icon_url || '');
+  const [faviconUrl, setFaviconUrl] = useState(settings.favicon_url || '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [faviconUploading, setFaviconUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [faviconDragOver, setFaviconDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+  const faviconInputRef = useRef(null);
+
+  useEffect(() => {
+    setName(settings.site_name || 'Vault');
+    setIcon(settings.site_icon || 'shield');
+    setIconUrl(settings.site_icon_url || '');
+    setFaviconUrl(settings.favicon_url || '');
+  }, [settings.site_name, settings.site_icon, settings.site_icon_url, settings.favicon_url]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.put('/admin/settings', { key: 'site_name', value: name.trim() || 'Vault' });
+      await api.put('/admin/settings', { key: 'site_icon', value: icon });
+      onSave('site_name', name.trim() || 'Vault');
+      onSave('site_icon', icon);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { alert('保存失败'); }
+    finally { setSaving(false); }
+  };
+
+  const uploadFile = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return alert('请上传图片文件');
+    if (file.size > 512 * 1024) return alert('图片不能超过 512 KB');
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('icon', file);
+      const { data } = await api.post('/admin/settings/upload-icon', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (data.success) {
+        setIconUrl(data.url);
+        onSave('site_icon_url', data.url);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || '上传失败');
+    } finally { setUploading(false); }
+  };
+
+  const handleClearCustom = async () => {
+    try {
+      await api.delete('/admin/settings/upload-icon');
+      setIconUrl('');
+      onSave('site_icon_url', '');
+    } catch { alert('清除失败'); }
+  };
+
+  const uploadFavicon = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/') && !file.name.endsWith('.ico')) return alert('请上传图片文件');
+    if (file.size > 512 * 1024) return alert('文件不能超过 512 KB');
+    setFaviconUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('favicon', file);
+      const { data } = await api.post('/admin/settings/upload-favicon', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (data.success) {
+        setFaviconUrl(data.url);
+        onSave('favicon_url', data.url);
+        // 当前页面立即生效
+        let link = document.querySelector("link[rel~='icon']");
+        if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+        link.href = data.url;
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || '上传失败');
+    } finally { setFaviconUploading(false); }
+  };
+
+  const handleClearFavicon = async () => {
+    try {
+      await api.delete('/admin/settings/upload-favicon');
+      setFaviconUrl('');
+      onSave('favicon_url', '');
+      // 恢复默认 favicon
+      const link = document.querySelector("link[rel~='icon']");
+      if (link) link.href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M16 5 L26 9 L26 17 C26 22 21 26.5 16 28 C11 26.5 6 22 6 17 L6 9 Z' fill='white' opacity='0.95'/%3E%3Cpath d='M13 16 L15.5 18.5 L20 13.5' stroke='%236366f1' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E";
+    } catch { alert('清除失败'); }
+  };
+
+  const PreviewIcon = (SITE_ICONS.find(i => i.value === icon) || SITE_ICONS[0]).Icon;
+
+  return (
+    <div className="vault-card p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="font-semibold" style={{ color: 'var(--text)' }}>品牌设置</h2>
+        <button onClick={handleSave} disabled={saving}
+          className="btn-primary text-sm"
+          style={{ padding: '6px 16px', opacity: saving ? 0.7 : 1 }}>
+          {saving ? '保存中...' : saved ? '✓ 已保存' : '保存'}
+        </button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* 预览 */}
+        <div className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border-bright)', width: 'fit-content' }}>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+            style={iconUrl ? {} : { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+            {iconUrl
+              ? <img src={iconUrl} alt="logo" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 8 }} />
+              : <PreviewIcon size={14} color="white" />}
+          </div>
+          <span className="font-semibold text-sm tracking-tight" style={{ color: 'var(--text)' }}>
+            {name || 'Vault'}
+          </span>
+        </div>
+
+        {/* 应用名称 */}
+        <div>
+          <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>应用名称</label>
+          <input className="vault-input" style={{ maxWidth: 240 }}
+            placeholder="Vault" value={name}
+            onChange={e => setName(e.target.value)} />
+        </div>
+
+        {/* 自定义上传图标 */}
+        <div>
+          <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-dim)' }}>
+            自定义图标
+            <span className="ml-1 font-normal" style={{ color: 'var(--text-muted)' }}>PNG / JPG / WebP / SVG，≤ 512 KB</span>
+          </label>
+          {iconUrl ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border-bright)' }}>
+              <img src={iconUrl} alt="custom icon" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 6 }} />
+              <span className="text-xs flex-1" style={{ color: 'var(--text-muted)' }}>已上传自定义图标</span>
+              <button onClick={handleClearCustom}
+                className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer' }}>
+                清除
+              </button>
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-dim)', border: '1px solid var(--border-bright)', cursor: 'pointer' }}>
+                {uploading ? '上传中...' : '重新上传'}
+              </button>
+            </div>
+          ) : (
+            <div
+              onClick={() => !uploading && fileInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); uploadFile(e.dataTransfer.files[0]); }}
+              className="flex flex-col items-center justify-center gap-1.5 rounded-xl transition-all"
+              style={{
+                height: 80, cursor: uploading ? 'wait' : 'pointer',
+                border: `2px dashed ${dragOver ? '#6366f1' : 'var(--border-bright)'}`,
+                background: dragOver ? 'rgba(99,102,241,0.06)' : 'var(--bg)',
+              }}>
+              {uploading
+                ? <span className="text-sm" style={{ color: 'var(--text-muted)' }}>上传中...</span>
+                : <>
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>点击或拖拽图片到这里</span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>上传后将覆盖预设图标</span>
+                  </>}
+            </div>
+          )}
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+            onChange={e => { uploadFile(e.target.files[0]); e.target.value = ''; }} />
+        </div>
+
+        {/* 预设图标（无自定义图标时生效） */}
+        <div style={{ opacity: iconUrl ? 0.4 : 1, pointerEvents: iconUrl ? 'none' : 'auto' }}>
+          <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-dim)' }}>
+            预设图标
+            {iconUrl && <span className="ml-1 font-normal" style={{ color: 'var(--text-muted)' }}>（已被自定义图标覆盖）</span>}
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            {SITE_ICONS.map(({ value, label, Icon }) => (
+              <button key={value} onClick={() => setIcon(value)} title={label}
+                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+                style={{
+                  background: icon === value ? 'rgba(99,102,241,0.15)' : 'var(--bg)',
+                  border: `1px solid ${icon === value ? '#6366f1' : 'var(--border-bright)'}`,
+                  color: icon === value ? '#818cf8' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                }}>
+                <Icon size={16} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 分割线 */}
+        <div style={{ borderTop: '1px solid var(--border)' }} />
+
+        {/* Favicon 上传 */}
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-dim)' }}>
+            网站图标（浏览器标签页）
+          </label>
+          <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+            ICO / PNG / SVG，建议 32×32 或 64×64，≤ 512 KB
+          </p>
+          {faviconUrl ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border-bright)' }}>
+              <img src={faviconUrl} alt="favicon" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+              <span className="text-xs flex-1" style={{ color: 'var(--text-muted)' }}>已上传自定义标签页图标</span>
+              <button onClick={handleClearFavicon}
+                className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer' }}>
+                清除
+              </button>
+              <button onClick={() => faviconInputRef.current?.click()} disabled={faviconUploading}
+                className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-dim)', border: '1px solid var(--border-bright)', cursor: 'pointer' }}>
+                {faviconUploading ? '上传中...' : '重新上传'}
+              </button>
+            </div>
+          ) : (
+            <div
+              onClick={() => !faviconUploading && faviconInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setFaviconDragOver(true); }}
+              onDragLeave={() => setFaviconDragOver(false)}
+              onDrop={e => { e.preventDefault(); setFaviconDragOver(false); uploadFavicon(e.dataTransfer.files[0]); }}
+              className="flex flex-col items-center justify-center gap-1.5 rounded-xl transition-all"
+              style={{
+                height: 72, cursor: faviconUploading ? 'wait' : 'pointer',
+                border: `2px dashed ${faviconDragOver ? '#6366f1' : 'var(--border-bright)'}`,
+                background: faviconDragOver ? 'rgba(99,102,241,0.06)' : 'var(--bg)',
+              }}>
+              {faviconUploading
+                ? <span className="text-sm" style={{ color: 'var(--text-muted)' }}>上传中...</span>
+                : <span className="text-sm" style={{ color: 'var(--text-muted)' }}>点击或拖拽图标文件到这里</span>}
+            </div>
+          )}
+          <input ref={faviconInputRef} type="file" accept="image/*,.ico" style={{ display: 'none' }}
+            onChange={e => { uploadFavicon(e.target.files[0]); e.target.value = ''; }} />
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ── 主页面 ────────────────────────────────────────────────
 const TABS = [
   { key: 'users', label: '用户管理', icon: Users },
@@ -773,33 +1035,38 @@ export default function AdminUsers() {
 
       {/* ── 系统设置 Tab ── */}
       {tab === 'settings' && (
-        <div className="vault-card p-6 max-w-lg">
-          <h2 className="font-semibold mb-5" style={{ color: 'var(--text)' }}>系统设置</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* 注册开关 */}
-            <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border-bright)' }}>
-              <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>允许公开注册</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  关闭后登录页隐藏注册入口，仅管理员可创建新用户
-                </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+          {/* 注册开关 */}
+          <div className="vault-card p-6">
+            <h2 className="font-semibold mb-5" style={{ color: 'var(--text)' }}>系统设置</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border-bright)' }}>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>允许公开注册</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    关闭后登录页隐藏注册入口，仅管理员可创建新用户
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleSaveSetting('allow_register', settings.allow_register === '1' ? '0' : '1')}
+                  disabled={savingSettings}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                  {settings.allow_register === '1'
+                    ? <ToggleRight size={36} style={{ color: 'var(--success)' }} />
+                    : <ToggleLeft size={36} style={{ color: 'var(--text-muted)' }} />}
+                </button>
               </div>
-              <button
-                onClick={() => handleSaveSetting('allow_register', settings.allow_register === '1' ? '0' : '1')}
-                disabled={savingSettings}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
-                {settings.allow_register === '1'
-                  ? <ToggleRight size={36} style={{ color: 'var(--success)' }} />
-                  : <ToggleLeft size={36} style={{ color: 'var(--text-muted)' }} />}
-              </button>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                当前状态：注册功能
+                <span style={{ color: settings.allow_register === '1' ? 'var(--success)' : 'var(--danger)', fontWeight: 500, marginLeft: 4 }}>
+                  {settings.allow_register === '1' ? '已开启' : '已关闭'}
+                </span>
+              </p>
             </div>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              当前状态：注册功能
-              <span style={{ color: settings.allow_register === '1' ? 'var(--success)' : 'var(--danger)', fontWeight: 500, marginLeft: 4 }}>
-                {settings.allow_register === '1' ? '已开启' : '已关闭'}
-              </span>
-            </p>
           </div>
+
+          {/* 品牌设置 */}
+          <SiteBrandingCard settings={settings} onSave={(key, value) => setSettings(s => ({ ...s, [key]: value }))} />
         </div>
       )}
 

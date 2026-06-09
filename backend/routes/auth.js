@@ -183,4 +183,18 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// GET /api/auth/site-info  (公开，无需登录)
+router.get('/site-info', async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      "SELECT `key`, `value` FROM system_settings WHERE `key` IN ('site_name', 'site_icon', 'site_icon_url', 'favicon_url')"
+    );
+    const data = { site_name: 'Vault', site_icon: 'shield', site_icon_url: '', favicon_url: '' };
+    rows.forEach(r => { data[r.key] = r.value; });
+    res.json({ success: true, data });
+  } catch {
+    res.json({ success: true, data: { site_name: 'Vault', site_icon: 'shield', site_icon_url: '', favicon_url: '' } });
+  }
+});
+
 module.exports = router;

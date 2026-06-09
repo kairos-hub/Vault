@@ -22,9 +22,12 @@ function decrypt(cipherText) {
   if (!cipherText) return cipherText;
   try {
     const bytes = CryptoJS.AES.decrypt(cipherText, ENCRYPT_KEY);
-    return bytes.toString(CryptoJS.enc.Utf8);
+    const result = bytes.toString(CryptoJS.enc.Utf8);
+    // result 为空说明 key 不匹配或数据损坏（CryptoJS 不抛异常，静默返回空）
+    if (!result) return null;
+    return result;
   } catch (e) {
-    return cipherText; // 解密失败返回原文
+    return null;
   }
 }
 

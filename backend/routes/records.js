@@ -137,10 +137,11 @@ router.get('/:id', auth, async (req, res) => {
       [record.id]
     );
 
-    record.values = values.map(v => ({
-      ...v,
-      field_value: v.is_sensitive && v.is_encrypted ? decrypt(v.field_value) : v.field_value
-    }));
+    record.values = values.map(v => {
+      if (!v.is_sensitive || !v.is_encrypted) return v;
+      const plain = decrypt(v.field_value);
+      return { ...v, field_value: plain ?? v.field_value };
+    });
 
     res.json({ success: true, data: record });
   } catch (err) {
@@ -297,7 +298,10 @@ router.post('/:id/decrypt', auth, async (req, res) => {
     if (!v.is_sensitive) return res.status(400).json({ success: false, message: '非敏感字段' });
 
     const plain = v.is_encrypted ? decrypt(v.field_value) : v.field_value;
-    res.json({ success: true, value: plain });
+    if (v.is_encrypted && v.field_value && plain === null) {
+      return res.status(422).json({ success: false, message: '解密失败：ENCRYPT_KEY 与数据加密时不一致，请检查 .env 配置' });
+    }
+    res.json({ success: true, value: plain ?? '' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
