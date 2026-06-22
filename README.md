@@ -1,6 +1,6 @@
 # Vault — 账号密码管理系统
 
-一个小而美的自托管账号密码管理系统，支持多用户、多产品分类、自定义字段、AES 加密存储。
+自托管账号密码管理系统，支持多用户、多产品分类、自定义字段、AES 加密存储。
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green)
